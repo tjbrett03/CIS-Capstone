@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CIS Capstone</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <header>
+        <h1>CIS Capstone</h1>
+        <nav>
+            <a href="/">Home</a>
+        </nav>
+    </header>
+
+    <main>
+        <h2>Welcome</h2>
+
+        <section>
+            <h3>Select your goal:</h3>
+           
+            <select id="goal-select" name="goal">
+                <option value="">-- Choose a goal --</option>
+                {% for id, goal in goals.items() %}
+                <option value="{{ id }}">{{ goal.label }}</option>
+                {% endfor %}
+            </select>
+        </section>
+
+        <section>
+            <h3>Select your audience:</h3>
+            <select id="audience-select" name="audience">
+                <option value="">-- Choose an audience --</option>
+                {% for id, audience in audiences.items() %}
+                <option value="{{ id }}">{{ audience.label }}</option>
+                {% endfor %}
+            </select>
+        </section>
+    </main>
+
+    <footer>
+        <p>CIS Capstone Project</p>
+    </footer>
+</body>
+</html>
