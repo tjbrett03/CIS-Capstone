@@ -37,10 +37,25 @@
                 {% endfor %}
             </select>
         </section>
+
+        <div class="nav-actions">
+            <button type="button" onclick="goToInterview()">Next &rarr;</button>
+        </div>
     </main>
 
     <footer>
         <p>CIS Capstone Project</p>
     </footer>
+    <script>
+        function goToInterview() {
+            const goal = document.getElementById("goal-select").value;
+            const audience = document.getElementById("audience-select").value;
+            if (!goal || !audience) {
+                alert("Please select both a goal and an audience before continuing.");
+                return;
+            }
+            window.location.href = `/interview?goal=${goal}&audience=${audience}`;
+        }
+    </script>
 </body>
 </html>

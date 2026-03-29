@@ -67,3 +67,185 @@ footer {
     color: #888;
     font-size: 0.875rem;
 }
+
+/* --- Button --- */
+button {
+    padding: 0.5rem 1.25rem;
+    background-color: #333;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+button:hover {
+    background-color: #000;
+}
+
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.nav-actions {
+    margin-top: 1.5rem;
+    display: flex;
+    justify-content: flex-end;
+}
+
+/* --- Interview context tags --- */
+.interview-context {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+}
+
+.tag {
+    background-color: #f0f0f0;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 0.2rem 0.6rem;
+    font-size: 0.85rem;
+    color: #444;
+}
+
+.btn-debug-export {
+    margin-left: auto;
+    font-size: 0.85rem;
+    color: #666;
+    text-decoration: none;
+    border: 1px dashed #bbb;
+    border-radius: 4px;
+    padding: 0.2rem 0.6rem;
+}
+
+.btn-debug-export:hover {
+    color: #333;
+    border-color: #333;
+}
+
+.btn-restart {
+    margin-left: auto;
+    font-size: 0.85rem;
+    color: #888;
+    text-decoration: none;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 0.2rem 0.6rem;
+}
+
+.btn-restart:hover {
+    color: #c00;
+    border-color: #c00;
+}
+
+/* --- Chat log --- */
+.chat-log {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-height: 300px;
+    max-height: 60vh;
+    overflow-y: auto;
+    border: 1px solid #eee;
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background: #fafafa;
+}
+
+.message {
+    max-width: 80%;
+    padding: 0.6rem 0.9rem;
+    border-radius: 8px;
+    line-height: 1.5;
+}
+
+.message.assistant {
+    align-self: flex-start;
+    background-color: #fff;
+    border: 1px solid #e0e0e0;
+}
+
+.message.user {
+    align-self: flex-end;
+    background-color: #333;
+    color: #fff;
+}
+
+/* --- Extracted JSON result card --- */
+.message.extracted {
+    align-self: flex-start;
+    max-width: 100%;
+    background-color: #f5f9f5;
+    border: 1px solid #b2d8b2;
+}
+
+.extracted-label {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: #2a6e2a;
+}
+
+.message.extracted dl {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 0.25rem 1rem;
+}
+
+.message.extracted dt {
+    font-weight: 600;
+    color: #555;
+}
+
+.message.extracted dd {
+    margin: 0;
+}
+
+.message.extracted ul {
+    padding-left: 1rem;
+    margin: 0;
+}
+
+/* --- Chat form --- */
+.chat-form {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-end;
+}
+
+/* --- Debug context panel --- */
+.debug-context {
+    font-size: 0.75rem;
+    color: #888;
+    border: 1px dashed #ccc;
+    border-radius: 4px;
+    padding: 0.4rem 0.6rem;
+    margin-top: -0.25rem;
+}
+
+.debug-context summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: #aaa;
+}
+
+.debug-context pre {
+    margin-top: 0.5rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: #666;
+}
+
+.chat-form textarea {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1rem;
+    font-family: inherit;
+    resize: none;
+    line-height: 1.5;
+}

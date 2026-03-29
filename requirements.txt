@@ -1,3 +1,5 @@
 flask>=3.0
 python-dotenv>=1.0
 gunicorn>=22.0
+requests>=2.32
+Flask-Session>=0.8
