@@ -105,12 +105,14 @@ def chat():
     )
 
     try:
+        temperature = current_app.config.get("LLM_TEMPERATURE", 0.7)
         resp = requests.post(
             "http://localhost:11434/api/chat",
             json={
                 "model": "gemma2:9b",
                 "messages": [{"role": "system", "content": system_content}] + messages,
                 "stream": False,
+                "options": {"temperature": temperature},
             },
             timeout=60,
         )
