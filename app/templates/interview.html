@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Story Interview — CIS Capstone</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
 </head>
 <body>
     <header>
@@ -28,8 +29,7 @@
             {% for msg in messages %}
             <div class="message {{ msg.role }}{% if msg.role == 'assistant' and msg.content.strip().startswith('{') %} extracted{% endif %}">
                 {% if msg.role == 'assistant' and msg.content.strip().startswith('{') %}
-                    <p class="extracted-label">Story elements captured:</p>
-                    <p>{{ msg.content }}</p>
+                    <pre>{{ msg.content.strip() }}</pre>
                 {% else %}
                     <p>{{ msg.content }}</p>
                 {% endif %}
@@ -38,8 +38,8 @@
         </div>
 
         <form id="chat-form" class="chat-form" autocomplete="off">
-            <textarea id="user-input" name="message" placeholder="Type your response..." rows="2" required></textarea>
-            <button type="submit" id="send-btn">Send</button>
+            <textarea id="user-input" name="message" placeholder="{% if completed %}Interview complete.{% else %}Type your response...{% endif %}" rows="2" {% if completed %}disabled{% endif %} required></textarea>
+            <button type="submit" id="send-btn" {% if completed %}disabled{% endif %}>{% if completed %}Done{% else %}Send{% endif %}</button>
         </form>
     </main>
 
@@ -55,6 +55,14 @@
 
         chatLog.scrollTop = chatLog.scrollHeight;
 
+        function lockForm() {
+            input.disabled = true;
+            input.placeholder = "Interview complete.";
+            sendBtn.disabled = true;
+            sendBtn.textContent = "Done";
+        }
+
+
         function escapeHtml(str) {
             return String(str)
                 .replace(/&/g, "&amp;")
@@ -63,35 +71,19 @@
                 .replace(/"/g, "&quot;");
         }
 
-        function renderExtracted(data) {
-            const quotes = (data.raw_quotes || [])
-                .map(q => `<li>"${escapeHtml(q)}"</li>`)
-                .join("");
-            return `
-                <p class="extracted-label">Story elements captured:</p>
-                <dl>
-                    <dt>Person</dt><dd>${escapeHtml(data.person || "")}</dd>
-                    <dt>Moment</dt><dd>${escapeHtml(data.moment || "")}</dd>
-                    <dt>Tension</dt><dd>${escapeHtml(data.tension || "")}</dd>
-                    <dt>Change</dt><dd>${escapeHtml(data.change || "")}</dd>
-                    <dt>Outcome</dt><dd>${escapeHtml(data.outcome || "")}</dd>
-                    ${quotes ? `<dt>Raw quotes</dt><dd><ul>${quotes}</ul></dd>` : ""}
-                </dl>
-            `;
-        }
-
-        function appendMessage(role, content) {
+function appendMessage(role, content) {
             const div = document.createElement("div");
             div.className = `message ${role}`;
 
             const trimmed = content.trim();
             if (role === "assistant" && trimmed.startsWith("{") && trimmed.endsWith("}")) {
                 try {
-                    div.innerHTML = renderExtracted(JSON.parse(trimmed));
-                    div.classList.add("extracted");
+                    const pretty = JSON.stringify(JSON.parse(trimmed), null, 2);
+                    div.innerHTML = `<pre>${escapeHtml(pretty)}</pre>`;
                 } catch {
-                    div.innerHTML = `<p>${escapeHtml(content)}</p>`;
+                    div.innerHTML = `<pre>${escapeHtml(trimmed)}</pre>`;
                 }
+                div.classList.add("extracted");
             } else {
                 div.innerHTML = `<p>${escapeHtml(content)}</p>`;
             }
@@ -111,10 +103,14 @@
             sendBtn.disabled = true;
             sendBtn.textContent = "...";
 
+            let done = false;
             try {
                 const resp = await fetch("/chat", {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRFToken": document.querySelector('meta[name="csrf-token"]').content
+                    },
                     body: JSON.stringify({ message: text })
                 });
                 const data = await resp.json();
@@ -125,14 +121,22 @@
                     if (data.debug_context) {
                         appendDebugContext(data.debug_context);
                     }
+                    const trimmed = data.reply.trim();
+                    if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+                        done = true;
+                    }
                 }
             } catch {
                 appendMessage("assistant", "Something went wrong. Please try again.");
             } finally {
-                input.disabled = false;
-                sendBtn.disabled = false;
-                sendBtn.textContent = "Send";
-                input.focus();
+                if (done) {
+                    lockForm();
+                } else {
+                    input.disabled = false;
+                    sendBtn.disabled = false;
+                    sendBtn.textContent = "Send";
+                    input.focus();
+                }
             }
         });
 

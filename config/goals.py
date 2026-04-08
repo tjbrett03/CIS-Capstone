@@ -1,4 +1,9 @@
-# Define the learning/project goals selectable in the app
+# Defines the content goals selectable on the index page.
+# Each key is the goal ID used in URL params and session storage.
+# - label: display name shown in the UI
+# - tone: intended voice for the final written output
+# - length: target word count for the final output
+# - priority: injected into the system prompt as {goal_priority} to guide the model's interview focus
 GOALS = {
     "event_promo": {
         "label": "Promote an Event",

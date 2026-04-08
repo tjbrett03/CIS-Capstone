@@ -8,11 +8,13 @@ from config.audiences import AUDIENCES
 INTERVIEWS_DIR = os.path.join(os.path.dirname(__file__), "..", "interviews")
 _PROMPT_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "system_prompt.txt")
 
+# Load the system prompt once at startup. Requires a Flask restart to pick up file changes.
 with open(_PROMPT_PATH, "r", encoding="utf-8") as _f:
     SYSTEM_PROMPT = _f.read()
 
 
 def save_extraction(session_id, payload):
+    # Persist the extracted story elements to a JSON file in the interviews directory.
     os.makedirs(INTERVIEWS_DIR, exist_ok=True)
     path = os.path.join(INTERVIEWS_DIR, f"interview_{session_id}.json")
     with open(path, "w", encoding="utf-8") as f:
@@ -26,6 +28,7 @@ def index():
     return render_template("index.html", goals=GOALS, audiences=AUDIENCES)
 
 
+# First message shown to the user before any model interaction.
 OPENING_MESSAGE = "To start, can you tell me a little about the person at the center of this story? You don't need to use their name — just help me picture who they are."
 
 
@@ -37,7 +40,7 @@ def interview():
     if goal_id not in GOALS or audience_id not in AUDIENCES:
         return redirect(url_for("main.index"))
 
-    # Only reset if starting a new interview (goal/audience changed or no existing session)
+    # Only reset the session if the goal or audience has changed, preserving an in-progress interview on refresh.
     if session.get("goal_id") != goal_id or session.get("audience_id") != audience_id:
         session["goal_id"] = goal_id
         session["audience_id"] = audience_id
@@ -51,11 +54,13 @@ def interview():
         audience=AUDIENCES[audience_id],
         messages=session["messages"],
         debug_context=current_app.config.get("DEBUG_CONTEXT", False),
+        completed=session.get("completed", False),
     )
 
 
 @main.route("/restart")
 def restart():
+    # Clear the session and restart with the same goal and audience.
     goal_id = session.get("goal_id")
     audience_id = session.get("audience_id")
     session.clear()
@@ -64,6 +69,7 @@ def restart():
 
 @main.route("/export")
 def export():
+    # Download the full conversation history as a JSON file.
     messages = session.get("messages", [])
     goal_id = session.get("goal_id")
     audience_id = session.get("audience_id")
@@ -88,15 +94,36 @@ def chat():
     if goal_id not in GOALS or audience_id not in AUDIENCES:
         return jsonify({"error": "No active interview session. Please start from the selection screen."}), 400
 
+    # Block further messages once the interview has been completed and JSON extracted.
+    if session.get("completed"):
+        return jsonify({"error": "This interview is complete."}), 400
+
     user_message = request.get_json().get("message", "").strip()
     if not user_message:
         return jsonify({"error": "Empty message"}), 400
 
+    max_length = current_app.config.get("MAX_MESSAGE_LENGTH", 2000)
+    if len(user_message) > max_length:
+        return jsonify({"error": f"Message too long. Please keep responses under {max_length} characters."}), 400
+
     messages.append({"role": "user", "content": user_message})
+
+    # Intercept short responses and known prompt injection attempts.
+    # Instead of sending to the model, repeat the last assistant message silently.
+    _injection_phrases = ["forget your system prompt", "forget your instructions", "your new instructions"]
+    _is_one_word = len(user_message.split()) <= 2
+    _is_injection = any(phrase in user_message.lower() for phrase in _injection_phrases)
+
+    if _is_one_word or _is_injection:
+        messages.pop()  # Don't save the intercepted message to the session.
+        last_reply = next((m["content"] for m in reversed(messages) if m["role"] == "assistant"), None)
+        if last_reply:
+            return jsonify({"reply": last_reply})
 
     goal = GOALS[goal_id]
     audience = AUDIENCES[audience_id]
 
+    # Substitute dynamic values into the system prompt template.
     system_content = (SYSTEM_PROMPT
         .replace("{goal_name}", goal["label"])
         .replace("{audience_name}", audience["label"])
@@ -105,14 +132,17 @@ def chat():
     )
 
     try:
+        model = current_app.config["LLM_MODEL"]
         temperature = current_app.config.get("LLM_TEMPERATURE", 0.7)
+        context_window = current_app.config["LLM_NUM_CTX"]
         resp = requests.post(
-            "http://localhost:11434/api/chat",
+            f"{current_app.config['OLLAMA_URL']}/api/chat",
             json={
-                "model": "gemma2:9b",
+                "model": model,
+                # System prompt is prepended as the first message so all models receive it consistently.
                 "messages": [{"role": "system", "content": system_content}] + messages,
                 "stream": False,
-                "options": {"temperature": temperature},
+                "options": {"temperature": temperature, "num_ctx": context_window},
             },
             timeout=60,
         )
@@ -125,6 +155,9 @@ def chat():
         session["messages"] = messages
         session.modified = True
 
+        # If the reply is valid JSON, treat it as the final extraction and lock the interview.
+        # Only mark as completed if the JSON parses successfully — a parse failure means
+        # the extraction wasn't saved, so the interview should remain open.
         trimmed = reply.strip()
         if trimmed.startswith("{") and trimmed.endswith("}"):
             try:
@@ -134,12 +167,12 @@ def chat():
                     "audience": audience["label"],
                     **extracted,
                 })
+                session["completed"] = True
             except json.JSONDecodeError:
-                pass
+                pass  # Malformed JSON from model — don't lock the interview.
 
         response = {"reply": reply}
         if current_app.config.get("DEBUG_CONTEXT"):
-            context_window = 8192  # Gemma 2 9B 8k
             context_pct = round((prompt_tokens / context_window) * 100, 1) if prompt_tokens else None
             response["debug_context"] = {
                 "goal": goal["label"],
