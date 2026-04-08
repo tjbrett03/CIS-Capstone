@@ -1,9 +1,11 @@
+import hmac
 import json
 import os
 import requests
-from flask import Blueprint, render_template, request, jsonify, abort, session, redirect, url_for, current_app
+from flask import Blueprint, render_template, request, jsonify, abort, session, redirect, url_for, current_app, flash
 from config.goals import GOALS
 from config.audiences import AUDIENCES
+from app import limiter
 
 INTERVIEWS_DIR = os.path.join(os.path.dirname(__file__), "..", "interviews")
 _PROMPT_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "system_prompt.txt")
@@ -21,6 +23,37 @@ def save_extraction(session_id, payload):
         json.dump(payload, f, indent=2, ensure_ascii=False)
 
 main = Blueprint("main", __name__)
+
+
+@main.before_request
+def require_auth():
+    # Allow login/logout through without authentication.
+    if request.endpoint in ("main.login", "main.logout"):
+        return
+    if not session.get("authenticated"):
+        return redirect(url_for("main.login"))
+
+
+@main.route("/login", methods=["GET", "POST"])
+@limiter.limit("5 per minute; 20 per hour", methods=["POST"])
+def login():
+    if session.get("authenticated"):
+        return redirect(url_for("main.index"))
+    error = None
+    if request.method == "POST":
+        password = request.form.get("password", "")
+        expected = current_app.config["APP_PASSWORD"]
+        if hmac.compare_digest(password.encode(), expected.encode()):
+            session["authenticated"] = True
+            return redirect(url_for("main.index"))
+        error = "Incorrect password."
+    return render_template("login.html", error=error)
+
+
+@main.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("main.login"))
 
 
 @main.route("/")

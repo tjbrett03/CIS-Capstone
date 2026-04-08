@@ -36,3 +36,8 @@ class Config:
 
     # Sampling temperature. Lower = more deterministic, higher = more creative.
     LLM_TEMPERATURE = float(os.environ.get("LLM_TEMPERATURE", "0.2"))
+
+    # Password required to access the app. Must be set in .env.
+    APP_PASSWORD = os.environ.get("APP_PASSWORD")
+    if not APP_PASSWORD:
+        raise RuntimeError("APP_PASSWORD is not set. Add it to your .env file.")

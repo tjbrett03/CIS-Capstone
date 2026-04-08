@@ -4,3 +4,4 @@ gunicorn>=22.0
 requests>=2.32
 Flask-Session>=0.8
 Flask-WTF>=1.2
+flask-limiter>=3.5

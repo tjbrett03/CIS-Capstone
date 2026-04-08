@@ -191,6 +191,32 @@ button:disabled {
 }
 
 
+/* --- Login form --- */
+.login-form {
+    max-width: 360px;
+    margin: 4rem auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.login-form h2 {
+    margin-bottom: 0.5rem;
+}
+
+.login-form input[type="password"] {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1rem;
+    font-family: inherit;
+}
+
+.login-error {
+    color: #c00;
+    font-size: 0.9rem;
+}
+
 /* --- Chat form --- */
 .chat-form {
     display: flex;

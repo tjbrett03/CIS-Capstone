@@ -1,9 +1,12 @@
 from flask import Flask
 from flask_session import Session
 from flask_wtf.csrf import CSRFProtect
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from config import Config
 
 csrf = CSRFProtect()
+limiter = Limiter(key_func=get_remote_address)
 
 
 def create_app(config_class=Config):
@@ -16,6 +19,9 @@ def create_app(config_class=Config):
 
     # Attach CSRF protection — validates tokens on all state-changing requests.
     csrf.init_app(app)
+
+    # Attach rate limiter — individual limits are applied per route.
+    limiter.init_app(app)
 
     from app.routes import main
     app.register_blueprint(main)

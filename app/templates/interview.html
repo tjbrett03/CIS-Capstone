@@ -23,6 +23,7 @@
             <a href="/export" class="btn-debug-export">Export Conversation</a>
             {% endif %}
             <a href="/restart" class="btn-restart">Start Over</a>
+            <a href="{{ url_for('main.logout') }}" class="btn-restart">Sign Out</a>
         </div>
 
         <div id="chat-log" class="chat-log">
