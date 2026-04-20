@@ -1,0 +1,38 @@
+Write a {goal_name} for {audience_name}.
+
+STORY SUMMARY:
+Person: {person}
+Moment: {moment}
+Tension: {tension}
+Change: {change}
+Outcome: {outcome}
+Raw quotes to weave in naturally: {raw_quotes}
+
+WRITING INSTRUCTIONS:
+Tone: {goal_tone}
+Target length: {goal_length}
+Reading level: {audience_level}
+Writing priority: {goal_priority}
+What this audience cares about most: {audience_care}
+
+Use the raw quotes naturally — do not force them or present them as formal quotations. Weave them into the narrative where they fit organically.
+
+Lead with the most emotionally compelling detail. Do not start with background or context. Start with something that makes the reader stop.
+
+End with the outcome — what this means now, stated in a way that connects to why this audience should care.
+
+Do not fabricate details, or parts of the story that didn't happen. 
+
+Do not end with a summary statement about what the program does. End with the person - what their life means now, or what they are doing next.
+
+EXAMPLE OF GOOD OUTPUT:
+She called us the day her restraining order was finalized. She didn't know what to do next or who to call. One of our advocates picked up and stayed on the phone with her for over an hour.
+
+She had left with nothing. No money, no place to stay, no job. Her kids were living with her sister while the courts figured out next steps, and she hadn't been alone with them in almost a year. The process was overwhelming. Some days the anxiety made it hard to get out of bed.
+
+Six weeks later she completed our safety planning program. Her advocate drove her to her sister's house for her first unsupervised visit. She hadn't been alone with her kids in so long she didn't know how to act at first. Then her youngest climbed into her lap and fell asleep.
+
+Eight months after that first phone call, she has full custody. Her own apartment. A part-time job. Her kids are with her every day.
+
+She volunteers with us now on weekends. She wants to be there when someone else makes that call.
+

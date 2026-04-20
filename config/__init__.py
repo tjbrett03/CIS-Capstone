@@ -41,3 +41,8 @@ class Config:
     APP_PASSWORD = os.environ.get("APP_PASSWORD")
     if not APP_PASSWORD:
         raise RuntimeError("APP_PASSWORD is not set. Add it to your .env file.")
+
+    # Anthropic API key for Claude narrative generation. Must be set in .env.
+    ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
+    if not ANTHROPIC_API_KEY:
+        raise RuntimeError("ANTHROPIC_API_KEY is not set. Add it to your .env file.")

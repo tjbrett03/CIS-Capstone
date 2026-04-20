@@ -23,11 +23,17 @@ AUDIENCES = {
         "values": "Prove it works, show me numbers, connect outcomes to the mission I funded.",
         "guidance": "Credibility first. Lead with a specific outcome, support it with data, tie it back to the funder's stated goals. Professional but not cold — one human moment grounds the evidence. Vague impact claims will lose this reader immediately.",
     },
-    "donors_volunteers": {
-        "label": "Individual Donors / Volunteers",
+    "donors": {
+        "label": "Individual Donors",
         "reading_level": "8–10th grade",
         "values": "Make me feel something and show me my contribution actually matters.",
         "guidance": "Emotion leads, evidence supports. The reader needs to see themselves in the story — they are the reason the outcome was possible. Avoid organizational language. Write to one person, not a crowd. Close with a specific, tangible ask tied to a real outcome.",
+    },
+    "volunteers": {
+        "label": "Volunteers",
+        "reading_level": "8–10th grade",
+        "values": "Show me the difference my time makes and that this work is worth showing up for.",
+        "guidance": "Center the human impact of direct service. The reader gives time, not money — connect their effort to a specific, visible outcome. Avoid organizational language. Make them feel the work they do matters to a real person, not a statistic. Close with something that affirms their role in the outcome.",
     },
     "board_members": {
         "label": "Board Members",

@@ -1,6 +1,7 @@
 import hmac
 import json
 import os
+import anthropic
 import requests
 from flask import Blueprint, render_template, request, jsonify, abort, session, redirect, url_for, current_app, flash
 from config.goals import GOALS
@@ -9,10 +10,55 @@ from app import limiter
 
 INTERVIEWS_DIR = os.path.join(os.path.dirname(__file__), "..", "interviews")
 _PROMPT_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "system_prompt.txt")
+_CLAUDE_PROMPT_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "claude_system_prompt.txt")
+_CLAUDE_USER_PROMPT_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "claude_user_prompt.txt")
 
-# Load the system prompt once at startup. Requires a Flask restart to pick up file changes.
+# Load prompts once at startup. Requires a Flask restart to pick up file changes.
 with open(_PROMPT_PATH, "r", encoding="utf-8") as _f:
     SYSTEM_PROMPT = _f.read()
+
+with open(_CLAUDE_PROMPT_PATH, "r", encoding="utf-8") as _f:
+    CLAUDE_SYSTEM_PROMPT = _f.read()
+
+with open(_CLAUDE_USER_PROMPT_PATH, "r", encoding="utf-8") as _f:
+    _USER_PROMPT_TEMPLATE = _f.read()
+
+
+def generate_narrative(api_key, interview_path, goal, audience):
+    """Read the saved interview file and call Claude to produce a finished narrative."""
+    with open(interview_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    raw_quotes = data.get("raw_quotes", [])
+    if isinstance(raw_quotes, list):
+        raw_quotes_str = "; ".join(f'"{q}"' for q in raw_quotes)
+    else:
+        raw_quotes_str = str(raw_quotes)
+
+    user_prompt = _USER_PROMPT_TEMPLATE.format(
+        goal_name=goal["label"],
+        audience_name=audience["label"],
+        person=data.get("person", ""),
+        moment=data.get("moment", ""),
+        tension=data.get("tension", ""),
+        change=data.get("change", ""),
+        outcome=data.get("outcome", ""),
+        raw_quotes=raw_quotes_str,
+        goal_tone=goal["tone"],
+        goal_length=goal["length"],
+        goal_priority=goal["priority"],
+        audience_level=audience["reading_level"],
+        audience_care=audience["values"],
+    )
+
+    client = anthropic.Anthropic(api_key=api_key)
+    message = client.messages.create(
+        model="claude-opus-4-6",
+        max_tokens=1024,
+        system=CLAUDE_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": user_prompt}],
+    )
+    return message.content[0].text
 
 
 def save_extraction(session_id, payload):
@@ -21,6 +67,7 @@ def save_extraction(session_id, payload):
     path = os.path.join(INTERVIEWS_DIR, f"interview_{session_id}.json")
     with open(path, "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2, ensure_ascii=False)
+    return path
 
 main = Blueprint("main", __name__)
 
@@ -73,8 +120,8 @@ def interview():
     if goal_id not in GOALS or audience_id not in AUDIENCES:
         return redirect(url_for("main.index"))
 
-    # Only reset the session if the goal or audience has changed, preserving an in-progress interview on refresh.
-    if session.get("goal_id") != goal_id or session.get("audience_id") != audience_id:
+    # Reset the session if the goal or audience changed, or if messages were cleared (e.g. after restart).
+    if session.get("goal_id") != goal_id or session.get("audience_id") != audience_id or "messages" not in session:
         session["goal_id"] = goal_id
         session["audience_id"] = audience_id
         session["messages"] = [{"role": "assistant", "content": OPENING_MESSAGE}]
@@ -93,10 +140,11 @@ def interview():
 
 @main.route("/restart")
 def restart():
-    # Clear the session and restart with the same goal and audience.
+    # Clear the interview state but keep the user authenticated.
     goal_id = session.get("goal_id")
     audience_id = session.get("audience_id")
-    session.clear()
+    session.pop("messages", None)
+    session.pop("completed", None)
     return redirect(url_for("main.interview", goal=goal_id, audience=audience_id))
 
 
@@ -195,16 +243,27 @@ def chat():
         if trimmed.startswith("{") and trimmed.endswith("}"):
             try:
                 extracted = json.loads(trimmed)
-                save_extraction(session.sid, {
+                interview_path = save_extraction(session.sid, {
                     "goal": goal["label"],
                     "audience": audience["label"],
                     **extracted,
                 })
+                narrative = generate_narrative(
+                    current_app.config["ANTHROPIC_API_KEY"],
+                    interview_path,
+                    goal,
+                    audience,
+                )
+                # Replace the raw JSON in the message history with the narrative.
+                messages[-1]["content"] = narrative
+                session["messages"] = messages
                 session["completed"] = True
+                response = {"reply": narrative, "completed": True}
             except json.JSONDecodeError:
                 pass  # Malformed JSON from model — don't lock the interview.
-
-        response = {"reply": reply}
+                response = {"reply": reply}
+        else:
+            response = {"reply": reply}
         if current_app.config.get("DEBUG_CONTEXT"):
             context_pct = round((prompt_tokens / context_window) * 100, 1) if prompt_tokens else None
             response["debug_context"] = {

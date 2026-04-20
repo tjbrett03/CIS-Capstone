@@ -5,3 +5,4 @@ requests>=2.32
 Flask-Session>=0.8
 Flask-WTF>=1.2
 flask-limiter>=3.5
+anthropic>=0.40

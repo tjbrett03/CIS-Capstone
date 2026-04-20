@@ -1,16 +1,37 @@
 services:
+  ollama:
+    image: ollama/ollama:latest
+    environment:
+      - OLLAMA_FLASH_ATTENTION=1
+      - OLLAMA_KEEP_ALIVE=-1
+    volumes:
+      # Persist downloaded models across container restarts.
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
   web:
     build: .
     ports:
       - "5000:5000"
     env_file:
       - .env
+    environment:
+      # Override OLLAMA_URL so the app talks to the ollama service, not the host.
+      - OLLAMA_URL=http://ollama:11434
     volumes:
       # Persist interview extractions and sessions across container restarts.
       - ./interviews:/app/interviews
       - ./flask_session:/app/flask_session
-    extra_hosts:
-      # Allows the container to reach Ollama running on the host machine on Linux.
-      # On Mac/Windows with Docker Desktop this is handled automatically.
-      - "host.docker.internal:host-gateway"
+    depends_on:
+      - ollama
     restart: unless-stopped
+
+volumes:
+  ollama_data:
