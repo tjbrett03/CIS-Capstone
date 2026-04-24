@@ -1,9 +1,9 @@
 # Defines the content goals selectable on the index page.
 # Each key is the goal ID used in URL params and session storage.
 # - label: display name shown in the UI
-# - tone: intended voice for the final written output
-# - length: target word count for the final output
-# - priority: injected into the system prompt as {goal_priority} to guide the model's interview focus
+# - tone: sent to Claude as {goal_tone} to guide voice and style
+# - length: sent to Claude as {goal_length} as a target word count
+# - priority: sent to Ollama as {goal_priority} to guide interview focus, and to Claude as {goal_priority}
 GOALS = {
     "event_promo": {
         "label": "Promote an Event",
@@ -30,9 +30,15 @@ GOALS = {
         "priority": "Open with human story, support with data, close connecting outcomes to funder priorities",
     },
     "donor_appeal": {
-        "label": "Appeal to Donor or Recruit Volunteer",
+        "label": "Appeal to a Donor",
         "tone": "Motivating, values-driven, personal",
         "length": "150–250 words",
-        "priority": "Lead with specific moment, connect to reader values, close with one clear ask",
+        "priority": "Lead with specific moment, connect to reader values, close with one clear donation ask",
+    },
+    "volunteer_recruit": {
+        "label": "Recruit a Volunteer",
+        "tone": "Energetic, purpose-driven, personal",
+        "length": "150–250 words",
+        "priority": "Lead with specific moment, connect to reader's desire to contribute, close with one clear volunteer ask",
     },
 }

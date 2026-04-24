@@ -1,9 +1,9 @@
 # Defines the target audiences selectable on the index page.
 # Each key is the audience ID used in URL params and session storage.
 # - label: display name shown in the UI
-# - reading_level: injected into the system prompt as {audience_level}
-# - values: what this audience cares about (informational, not sent to the model)
-# - guidance: writing advice for this audience (informational, not sent to the model)
+# - reading_level: sent to Ollama as {audience_level} and to Claude as part of writing instructions
+# - values: what this audience cares about — sent to Claude as {audience_care}
+# - guidance: writing advice for this audience (informational, not sent to any model)
 AUDIENCES = {
     "community_members": {
         "label": "Community Members Served",

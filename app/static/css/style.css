@@ -199,21 +199,6 @@ button:disabled {
     40%           { transform: translateY(-6px); }
 }
 
-/* --- Extracted JSON result card --- */
-.message.extracted {
-    align-self: flex-start;
-    max-width: 100%;
-    background-color: #f5f9f5;
-    border: 1px solid #b2d8b2;
-}
-
-.message.extracted pre {
-    white-space: pre-wrap;
-    word-break: break-word;
-    font-size: 0.85rem;
-    color: #333;
-}
-
 
 /* --- Login form --- */
 .login-form {

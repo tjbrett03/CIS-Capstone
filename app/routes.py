@@ -3,7 +3,7 @@ import json
 import os
 import anthropic
 import requests
-from flask import Blueprint, render_template, request, jsonify, abort, session, redirect, url_for, current_app, flash
+from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for, current_app
 from config.goals import GOALS
 from config.audiences import AUDIENCES
 from app import limiter
@@ -51,7 +51,7 @@ def generate_narrative(api_key, interview_path, goal, audience):
         audience_care=audience["values"],
     )
 
-    client = anthropic.Anthropic(api_key=api_key)
+    client = anthropic.Anthropic(api_key=api_key, timeout=60.0)
     message = client.messages.create(
         model="claude-opus-4-6",
         max_tokens=1024,
@@ -74,7 +74,7 @@ main = Blueprint("main", __name__)
 
 @main.before_request
 def require_auth():
-    # Allow login/logout through without authentication.
+    # Allow login and logout routes through without requiring authentication.
     if request.endpoint in ("main.login", "main.logout"):
         return
     if not session.get("authenticated"):
@@ -175,7 +175,7 @@ def chat():
     if goal_id not in GOALS or audience_id not in AUDIENCES:
         return jsonify({"error": "No active interview session. Please start from the selection screen."}), 400
 
-    # Block further messages once the interview has been completed and JSON extracted.
+    # Block further messages once the interview is complete and the narrative has been generated.
     if session.get("completed"):
         return jsonify({"error": "This interview is complete."}), 400
 
@@ -192,7 +192,7 @@ def chat():
     # Intercept short responses and known prompt injection attempts.
     # Instead of sending to the model, repeat the last assistant message silently.
     _injection_phrases = ["forget your system prompt", "forget your instructions", "your new instructions"]
-    _is_one_word = len(user_message.split()) <= 2
+    _is_one_word = len(user_message.split()) == 1
     _is_injection = any(phrase in user_message.lower() for phrase in _injection_phrases)
 
     if _is_one_word or _is_injection:
@@ -233,12 +233,9 @@ def chat():
         prompt_tokens = ollama_data.get("prompt_eval_count", 0)
 
         messages.append({"role": "assistant", "content": reply})
-        session["messages"] = messages
-        session.modified = True
 
-        # If the reply is valid JSON, treat it as the final extraction and lock the interview.
-        # Only mark as completed if the JSON parses successfully — a parse failure means
-        # the extraction wasn't saved, so the interview should remain open.
+        # If the reply looks like JSON, attempt extraction and narrative generation.
+        # If JSON parsing fails, treat it as a normal reply and keep the interview open.
         trimmed = reply.strip()
         if trimmed.startswith("{") and trimmed.endswith("}"):
             try:
@@ -254,15 +251,16 @@ def chat():
                     goal,
                     audience,
                 )
-                # Replace the raw JSON in the message history with the narrative.
+                # Store the narrative in place of the raw JSON and mark the interview complete.
                 messages[-1]["content"] = narrative
                 session["messages"] = messages
                 session["completed"] = True
                 response = {"reply": narrative, "completed": True}
             except json.JSONDecodeError:
-                pass  # Malformed JSON from model — don't lock the interview.
+                session["messages"] = messages
                 response = {"reply": reply}
         else:
+            session["messages"] = messages
             response = {"reply": reply}
         if current_app.config.get("DEBUG_CONTEXT"):
             context_pct = round((prompt_tokens / context_window) * 100, 1) if prompt_tokens else None
