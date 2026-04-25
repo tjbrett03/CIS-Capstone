@@ -7,6 +7,7 @@ from flask import Blueprint, render_template, request, jsonify, session, redirec
 from config.goals import GOALS
 from config.audiences import AUDIENCES
 from app import limiter
+from app import pii, readability
 
 INTERVIEWS_DIR = os.path.join(os.path.dirname(__file__), "..", "interviews")
 _PROMPT_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "system_prompt.txt")
@@ -24,41 +25,35 @@ with open(_CLAUDE_USER_PROMPT_PATH, "r", encoding="utf-8") as _f:
     _USER_PROMPT_TEMPLATE = _f.read()
 
 
-def generate_narrative(api_key, interview_path, goal, audience):
-    """Read the saved interview file and call Claude to produce a finished narrative."""
-    with open(interview_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
+CLAUDE_MODEL = "claude-sonnet-4-6"
+CLAUDE_MAX_TOKENS = 2048
 
-    raw_quotes = data.get("raw_quotes", [])
+
+def build_narrative_prompt(extracted, goal, audience):
+    """Build the user prompt for Claude from the extracted story fields."""
+    raw_quotes = extracted.get("raw_quotes", [])
     if isinstance(raw_quotes, list):
         raw_quotes_str = "; ".join(f'"{q}"' for q in raw_quotes)
     else:
         raw_quotes_str = str(raw_quotes)
 
-    user_prompt = _USER_PROMPT_TEMPLATE.format(
-        goal_name=goal["label"],
-        audience_name=audience["label"],
-        person=data.get("person", ""),
-        moment=data.get("moment", ""),
-        tension=data.get("tension", ""),
-        change=data.get("change", ""),
-        outcome=data.get("outcome", ""),
-        raw_quotes=raw_quotes_str,
-        goal_tone=goal["tone"],
-        goal_length=goal["length"],
-        goal_priority=goal["priority"],
-        audience_level=audience["reading_level"],
-        audience_care=audience["values"],
+    return (
+        _USER_PROMPT_TEMPLATE
+        .replace("{goal_name}", goal["label"])
+        .replace("{audience_name}", audience["label"])
+        .replace("{person}", extracted.get("person", ""))
+        .replace("{moment}", extracted.get("moment", ""))
+        .replace("{tension}", extracted.get("tension", ""))
+        .replace("{change}", extracted.get("change", ""))
+        .replace("{outcome}", extracted.get("outcome", ""))
+        .replace("{raw_quotes}", raw_quotes_str)
+        .replace("{goal_tone}", goal["tone"])
+        .replace("{goal_length}", goal["length"])
+        .replace("{goal_priority}", goal["priority"])
+        .replace("{audience_level}", audience["reading_level"])
+        .replace("{audience_care}", audience["values"])
     )
 
-    client = anthropic.Anthropic(api_key=api_key, timeout=60.0)
-    message = client.messages.create(
-        model="claude-opus-4-6",
-        max_tokens=1024,
-        system=CLAUDE_SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": user_prompt}],
-    )
-    return message.content[0].text
 
 
 def save_extraction(session_id, payload):
@@ -135,6 +130,8 @@ def interview():
         messages=session["messages"],
         debug_context=current_app.config.get("DEBUG_CONTEXT", False),
         completed=session.get("completed", False),
+        pii_findings=session.get("pii_findings", []),
+        readability=session.get("readability"),
     )
 
 
@@ -145,6 +142,8 @@ def restart():
     audience_id = session.get("audience_id")
     session.pop("messages", None)
     session.pop("completed", None)
+    session.pop("pii_findings", None)
+    session.pop("readability", None)
     return redirect(url_for("main.interview", goal=goal_id, audience=audience_id))
 
 
@@ -240,28 +239,41 @@ def chat():
         if trimmed.startswith("{") and trimmed.endswith("}"):
             try:
                 extracted = json.loads(trimmed)
-                interview_path = save_extraction(session.sid, {
+                save_extraction(session.sid, {
                     "goal": goal["label"],
                     "audience": audience["label"],
                     **extracted,
                 })
-                narrative = generate_narrative(
-                    current_app.config["ANTHROPIC_API_KEY"],
-                    interview_path,
-                    goal,
-                    audience,
+                user_prompt = build_narrative_prompt(extracted, goal, audience)
+                client = anthropic.Anthropic(api_key=current_app.config["ANTHROPIC_API_KEY"], timeout=60.0)
+                message = client.messages.create(
+                    model=CLAUDE_MODEL,
+                    max_tokens=CLAUDE_MAX_TOKENS,
+                    temperature=0.3,
+                    system=CLAUDE_SYSTEM_PROMPT,
+                    messages=[{"role": "user", "content": user_prompt}],
                 )
-                # Store the narrative in place of the raw JSON and mark the interview complete.
+                narrative = message.content[0].text
                 messages[-1]["content"] = narrative
+                pii_findings = pii.scan(narrative)
+                readability_score = readability.score(narrative, audience["reading_level"])
                 session["messages"] = messages
                 session["completed"] = True
-                response = {"reply": narrative, "completed": True}
+                session["pii_findings"] = pii_findings
+                session["readability"] = readability_score
+                response = {
+                    "reply": narrative,
+                    "completed": True,
+                    "pii_findings": pii_findings,
+                    "readability": readability_score,
+                }
             except json.JSONDecodeError:
                 session["messages"] = messages
                 response = {"reply": reply}
         else:
             session["messages"] = messages
             response = {"reply": reply}
+
         if current_app.config.get("DEBUG_CONTEXT"):
             context_pct = round((prompt_tokens / context_window) * 100, 1) if prompt_tokens else None
             response["debug_context"] = {
@@ -275,5 +287,6 @@ def chat():
         return jsonify(response)
     except requests.exceptions.ConnectionError:
         return jsonify({"error": "Could not connect to Ollama. Make sure it is running on port 11434."}), 503
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        current_app.logger.exception("Chat request failed")
+        return jsonify({"error": "Something went wrong. Please try again."}), 500

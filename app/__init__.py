@@ -5,6 +5,8 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from config import Config
 
+# Instantiated at module level so routes.py can import and apply them as
+# decorators before create_app() binds them to the Flask instance.
 csrf = CSRFProtect()
 limiter = Limiter(key_func=get_remote_address)
 
@@ -25,5 +27,10 @@ def create_app(config_class=Config):
 
     from app.routes import main
     app.register_blueprint(main)
+
+    # Load the Presidio/spaCy model into memory now so the first interview
+    # completion doesn't pay a 2–3s cold-start hit.
+    from app import pii
+    pii.warmup()
 
     return app

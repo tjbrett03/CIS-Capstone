@@ -266,3 +266,151 @@ button:disabled {
     resize: none;
     line-height: 1.5;
 }
+
+/* --- Narrative card (final output: banner, narrative, findings, copy) --- */
+.narrative-card {
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.banner {
+    border-radius: 6px;
+    padding: 0.6rem 0.9rem;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+.banner-warn {
+    background: #fff8db;
+    border: 1px solid #f0d264;
+    color: #5a4a00;
+}
+
+.banner-ok {
+    background: #e9f7ec;
+    border: 1px solid #a6d6b0;
+    color: #1f5a2c;
+}
+
+.readability {
+    font-size: 0.85rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    background: #f5f5f5;
+    border: 1px solid #e2e2e2;
+    color: #444;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.readability-matches {
+    background: #e9f7ec;
+    border-color: #a6d6b0;
+    color: #1f5a2c;
+}
+
+.readability-too_complex,
+.readability-too_simple {
+    background: #fff8db;
+    border-color: #f0d264;
+    color: #5a4a00;
+}
+
+.readability-score {
+    margin-left: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8rem;
+    color: #666;
+}
+
+.narrative {
+    line-height: 1.6;
+    color: #222;
+}
+
+.narrative p {
+    margin: 0 0 0.75rem 0;
+}
+
+.narrative p:last-child {
+    margin-bottom: 0;
+}
+
+.pii-flag {
+    background: #ffe9a8;
+    border-bottom: 2px solid #d49b00;
+    padding: 0 2px;
+    border-radius: 2px;
+    cursor: help;
+}
+
+.findings-list {
+    border: 1px solid #eee;
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+    background: #fafafa;
+}
+
+.findings-list summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: #555;
+    font-size: 0.9rem;
+}
+
+.finding {
+    margin-top: 0.6rem;
+    padding: 0.6rem 0.75rem;
+    border-left: 3px solid #d49b00;
+    background: #fff;
+    border-radius: 0 4px 4px 0;
+    font-size: 0.85rem;
+    line-height: 1.45;
+}
+
+.finding-text {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: #5a4a00;
+    margin-bottom: 0.35rem;
+}
+
+.finding-count {
+    display: inline-block;
+    background: #f0d264;
+    color: #5a4a00;
+    font-family: system-ui, sans-serif;
+    font-size: 0.75rem;
+    padding: 0.05rem 0.4rem;
+    border-radius: 10px;
+    margin-left: 0.35rem;
+    font-weight: 600;
+}
+
+.finding-reason,
+.finding-suggestion {
+    color: #333;
+    margin-top: 0.25rem;
+}
+
+.btn-copy {
+    align-self: flex-start;
+    background: #333;
+    color: #fff;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.btn-copy:hover {
+    background: #000;
+}

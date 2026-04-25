@@ -28,9 +28,19 @@
 
         <div id="chat-log" class="chat-log">
             {% for msg in messages %}
-            <div class="message {{ msg.role }}">
-                <p>{{ msg.content }}</p>
-            </div>
+                {% if loop.last and completed and msg.role == 'assistant' %}
+                {# Narrative card: rendered server-side on refresh, JS on first completion. #}
+                <div class="narrative-card" id="narrative-card"
+                     data-narrative="{{ msg.content }}"
+                     data-findings='{{ pii_findings|tojson }}'
+                     data-readability='{{ readability|tojson if readability else "null" }}'>
+                    {# Contents are populated by renderNarrativeCard() on DOMContentLoaded. #}
+                </div>
+                {% else %}
+                <div class="message {{ msg.role }}">
+                    <p>{{ msg.content }}</p>
+                </div>
+                {% endif %}
             {% endfor %}
         </div>
 
@@ -59,7 +69,6 @@
             sendBtn.textContent = "Done";
         }
 
-
         function escapeHtml(str) {
             return String(str)
                 .replace(/&/g, "&amp;")
@@ -68,7 +77,7 @@
                 .replace(/"/g, "&quot;");
         }
 
-function appendMessage(role, content) {
+        function appendMessage(role, content) {
             const div = document.createElement("div");
             div.className = `message ${role}`;
             div.innerHTML = `<p>${escapeHtml(content)}</p>`;
@@ -88,6 +97,120 @@ function appendMessage(role, content) {
         function removeTypingIndicator() {
             const el = document.getElementById("typing-indicator");
             if (el) el.remove();
+        }
+
+        // Render the narrative text with PII spans wrapped in <mark>.
+        // Findings are pre-deduped server-side and sorted by start offset.
+        // Paragraphs (blank-line-separated) are preserved as <p> elements.
+        function renderNarrativeBody(text, findings) {
+            const safeFindings = (findings || []).slice().sort((a, b) => a.start - b.start);
+            let html = "";
+            let cursor = 0;
+            for (const f of safeFindings) {
+                if (f.start < cursor) continue;
+                html += escapeHtml(text.slice(cursor, f.start));
+                const tooltip = escapeHtml(`${f.category_name}: ${f.reason}`);
+                html += `<mark class="pii-flag pii-cat-${f.category}" title="${tooltip}">${escapeHtml(text.slice(f.start, f.end))}</mark>`;
+                cursor = f.end;
+            }
+            html += escapeHtml(text.slice(cursor));
+            // Convert blank-line breaks into paragraphs.
+            return html.split(/\n\s*\n/).map(p => `<p>${p.replace(/\n/g, "<br>")}</p>`).join("");
+        }
+
+        function renderFindingsList(findings) {
+            if (!findings || findings.length === 0) return "";
+
+            // Collapse duplicate flags (same text + category) into one card with an occurrence count.
+            // Every occurrence is still highlighted in the narrative body — this only condenses the list.
+            const groups = new Map();
+            for (const f of findings) {
+                const key = `${f.category}|${f.text.toLowerCase()}`;
+                if (!groups.has(key)) {
+                    groups.set(key, { ...f, count: 1 });
+                } else {
+                    groups.get(key).count += 1;
+                }
+            }
+
+            const items = Array.from(groups.values()).map(f => {
+                const countBadge = f.count > 1 ? ` <span class="finding-count">×${f.count}</span>` : "";
+                return `
+                <div class="finding finding-cat-${f.category}">
+                    <div class="finding-text">&ldquo;${escapeHtml(f.text)}&rdquo;${countBadge}</div>
+                    <div class="finding-reason"><strong>${escapeHtml(f.category_name)}:</strong> ${escapeHtml(f.reason)}</div>
+                    <div class="finding-suggestion"><strong>Suggested fix:</strong> ${escapeHtml(f.suggestion)}</div>
+                </div>
+            `;
+            }).join("");
+
+            const uniqueCount = groups.size;
+            const totalCount = findings.length;
+            const label = uniqueCount === totalCount
+                ? (totalCount === 1 ? "1 flag" : `${totalCount} flags`)
+                : `${uniqueCount} unique flag${uniqueCount === 1 ? "" : "s"} (${totalCount} total occurrences)`;
+
+            return `<details class="findings-list" open>
+                <summary>${label} — review before sharing</summary>
+                ${items}
+            </details>`;
+        }
+
+        function renderNarrativeCard(card, narrative, findings, readability) {
+            const hasFlags = findings && findings.length > 0;
+            const banner = hasFlags
+                ? `<div class="banner banner-warn">We flagged content that may identify the person in this story. Review the highlighted sections below before sharing.</div>`
+                : `<div class="banner banner-ok">No sensitive information detected.</div>`;
+
+            let readabilityBlock = "";
+            if (readability && readability.summary) {
+                readabilityBlock = `<div class="readability readability-${readability.match}">
+                    <strong>Readability:</strong> ${escapeHtml(readability.summary)}
+                    ${readability.score !== null ? `<span class="readability-score">Flesch ${readability.score}</span>` : ""}
+                </div>`;
+            }
+
+            card.innerHTML = `
+                ${banner}
+                ${readabilityBlock}
+                <div class="narrative">${renderNarrativeBody(narrative, findings)}</div>
+                ${renderFindingsList(findings)}
+                <button type="button" class="btn-copy" id="btn-copy-narrative">Copy narrative</button>
+            `;
+
+            const copyBtn = card.querySelector("#btn-copy-narrative");
+            copyBtn.addEventListener("click", async () => {
+                try {
+                    await navigator.clipboard.writeText(narrative);
+                    copyBtn.textContent = "Copied!";
+                    setTimeout(() => { copyBtn.textContent = "Copy narrative"; }, 1500);
+                } catch {
+                    copyBtn.textContent = "Copy failed";
+                }
+            });
+        }
+
+        // Hydrate the server-rendered narrative card on page load (refresh case).
+        document.addEventListener("DOMContentLoaded", () => {
+            const card = document.getElementById("narrative-card");
+            if (!card) return;
+            const narrative = card.dataset.narrative || "";
+            let findings = [];
+            let readability = null;
+            try { findings = JSON.parse(card.dataset.findings || "[]"); } catch {}
+            try { readability = JSON.parse(card.dataset.readability || "null"); } catch {}
+            renderNarrativeCard(card, narrative, findings, readability);
+            chatLog.scrollTop = chatLog.scrollHeight;
+        });
+
+        // First-time completion: replace the streamed assistant message with a narrative card.
+        function appendNarrativeCard(narrative, findings, readability) {
+            const card = document.createElement("div");
+            card.className = "narrative-card";
+            card.id = "narrative-card";
+            chatLog.appendChild(card);
+            renderNarrativeCard(card, narrative, findings, readability);
+            chatLog.scrollTop = chatLog.scrollHeight;
         }
 
         form.addEventListener("submit", async (e) => {
@@ -116,14 +239,13 @@ function appendMessage(role, content) {
                 removeTypingIndicator();
                 if (data.error) {
                     appendMessage("assistant", `Error: ${data.error}`);
+                } else if (data.completed) {
+                    appendNarrativeCard(data.reply, data.pii_findings || [], data.readability || null);
+                    if (data.debug_context) appendDebugContext(data.debug_context);
+                    done = true;
                 } else {
                     appendMessage("assistant", data.reply);
-                    if (data.debug_context) {
-                        appendDebugContext(data.debug_context);
-                    }
-                    if (data.completed) {
-                        done = true;
-                    }
+                    if (data.debug_context) appendDebugContext(data.debug_context);
                 }
             } catch {
                 removeTypingIndicator();
