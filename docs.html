@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CIS Capstone — Application Documentation</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: Georgia, "Times New Roman", serif;
+            font-size: 11pt;
+            line-height: 1.65;
+            color: #222;
+            max-width: 780px;
+            margin: 0 auto;
+            padding: 2rem 2.5rem;
+        }
+
+        h1 {
+            font-size: 22pt;
+            font-weight: bold;
+            margin-bottom: 0.25rem;
+            border-bottom: 2px solid #222;
+            padding-bottom: 0.4rem;
+        }
+
+        .subtitle {
+            font-size: 11pt;
+            color: #555;
+            margin-bottom: 2rem;
+            font-style: italic;
+        }
+
+        h2 {
+            font-size: 14pt;
+            font-weight: bold;
+            margin-top: 2rem;
+            margin-bottom: 0.5rem;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 0.2rem;
+        }
+
+        h3 {
+            font-size: 11.5pt;
+            font-weight: bold;
+            margin-top: 1.25rem;
+            margin-bottom: 0.3rem;
+        }
+
+        p {
+            margin-bottom: 0.75rem;
+        }
+
+        ul, ol {
+            margin-left: 1.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        li {
+            margin-bottom: 0.3rem;
+        }
+
+        code {
+            font-family: "Courier New", Courier, monospace;
+            font-size: 9.5pt;
+            background: #f4f4f4;
+            border: 1px solid #ddd;
+            border-radius: 2px;
+            padding: 0.05rem 0.3rem;
+        }
+
+        pre {
+            font-family: "Courier New", Courier, monospace;
+            font-size: 9pt;
+            background: #f4f4f4;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 0.75rem 1rem;
+            margin-bottom: 0.75rem;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10pt;
+            margin-bottom: 1rem;
+        }
+
+        th {
+            background: #f0f0f0;
+            border: 1px solid #ccc;
+            padding: 0.4rem 0.6rem;
+            text-align: left;
+            font-weight: bold;
+        }
+
+        td {
+            border: 1px solid #ccc;
+            padding: 0.4rem 0.6rem;
+            vertical-align: top;
+        }
+
+        td:first-child {
+            font-family: "Courier New", Courier, monospace;
+            font-size: 9pt;
+            white-space: nowrap;
+        }
+
+        .note {
+            background: #fffbe6;
+            border-left: 3px solid #f0c75e;
+            padding: 0.5rem 0.75rem;
+            margin-bottom: 0.75rem;
+            font-size: 10.5pt;
+        }
+
+        .section-break {
+            margin-top: 2.5rem;
+        }
+
+        @media print {
+            body { padding: 0; }
+            h2 { page-break-after: avoid; }
+            h3 { page-break-after: avoid; }
+            pre { page-break-inside: avoid; }
+            table { page-break-inside: avoid; }
+        }
+    </style>
+</head>
+<body>
+
+<h1>CIS Capstone — Story Interview Application</h1>
+<p class="subtitle">Setup, Configuration, and User Guide</p>
+
+<h2>Overview</h2>
+<p>This application helps nonprofit staff surface powerful stories from their program work. A staff member selects a content goal and a target audience, then answers a short guided interview conducted by a local language model (Ollama). Once the interview is complete, the extracted story is sent to Claude (Anthropic API) to generate a finished, audience-ready narrative.</p>
+<p>The output screen displays the narrative with any sensitive information flagged for review and a readability score compared against the target audience level.</p>
+
+<h2>Architecture</h2>
+<ul>
+    <li><strong>Flask</strong> — Python web framework, handles routing, sessions, and auth</li>
+    <li><strong>Ollama</strong> — local LLM runtime; conducts the interview and extracts story elements as JSON</li>
+    <li><strong>Anthropic API (Claude)</strong> — generates the finished narrative from the extracted JSON</li>
+    <li><strong>Presidio + spaCy</strong> — PII scanning on the generated narrative</li>
+    <li><strong>textstat</strong> — Flesch Reading Ease readability scoring</li>
+    <li><strong>Docker Compose</strong> — runs the Flask app and Ollama together as containers</li>
+</ul>
+
+<h2>Prerequisites</h2>
+
+<h3>Running with Docker (recommended)</h3>
+<ul>
+    <li>Docker Desktop with the WSL2 backend enabled (Windows) or Docker Engine (Linux)</li>
+    <li>NVIDIA drivers if using GPU passthrough (optional but recommended for speed)</li>
+</ul>
+
+<h3>Running locally without Docker</h3>
+<ul>
+    <li>Python 3.12 or later</li>
+    <li>Ollama installed and running locally (<code>ollama.com</code>)</li>
+</ul>
+
+<h2>Setup</h2>
+
+<h3>1. Clone the repository</h3>
+<pre>git clone https://github.com/tjbrett03/CIS-Capstone.git
+cd CIS-Capstone</pre>
+
+<h3>2. Configure environment variables</h3>
+<p>Copy the example environment file and fill in the required values:</p>
+<pre>cp .env.example .env</pre>
+
+<table>
+    <thead>
+        <tr><th>Variable</th><th>Required</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr><td>FLASK_SECRET_KEY</td><td>Yes</td><td>A long random string used to sign session cookies. Generate with: <code>python -c "import secrets; print(secrets.token_hex(32))"</code></td></tr>
+        <tr><td>ANTHROPIC_API_KEY</td><td>Yes</td><td>Your Anthropic API key. Used to generate the narrative via Claude.</td></tr>
+        <tr><td>APP_PASSWORD</td><td>Yes</td><td>Password required to access the application.</td></tr>
+        <tr><td>LLM_MODEL</td><td>Yes</td><td>The Ollama model to use (e.g. <code>llama3.1:8b</code>). Must be pulled before running.</td></tr>
+        <tr><td>OLLAMA_URL</td><td>No</td><td>URL of the Ollama instance. Defaults to <code>http://localhost:11434</code>. Overridden automatically in Docker Compose.</td></tr>
+        <tr><td>LLM_NUM_CTX</td><td>No</td><td>Context window size in tokens. Default: <code>16384</code>.</td></tr>
+        <tr><td>LLM_TEMPERATURE</td><td>No</td><td>Sampling temperature. Default: <code>0.2</code>. Lower is more deterministic.</td></tr>
+        <tr><td>FLASK_DEBUG</td><td>No</td><td>Set to <code>true</code> during development for auto-reload. Default: <code>false</code>.</td></tr>
+        <tr><td>DEBUG_CONTEXT</td><td>No</td><td>Set to <code>true</code> to show a debug panel with token usage and message history.</td></tr>
+    </tbody>
+</table>
+
+<h2>Running with Docker</h2>
+
+<h3>1. Start the stack</h3>
+<pre>docker compose up --build -d</pre>
+<p>This builds the Flask app image (including the spaCy language model) and starts both the app and Ollama containers. The build takes a few minutes on first run due to the spaCy model download.</p>
+
+<h3>2. Pull the language model</h3>
+<p>On first run, pull the Ollama model into the container. This only needs to be done once — the model is stored in a named Docker volume and persists across restarts.</p>
+<pre>docker compose exec ollama ollama pull llama3.1:8b</pre>
+
+<h3>3. Open the application</h3>
+<p>Visit <code>http://localhost:5000</code> in your browser.</p>
+
+<div class="note">
+    <strong>GPU passthrough:</strong> GPU support is enabled by default in <code>docker-compose.yml</code> for NVIDIA GPUs. To run CPU-only, comment out or remove the <code>deploy</code> block in <code>docker-compose.yml</code>.
+</div>
+
+<h2>Running Locally (without Docker)</h2>
+
+<h3>1. Create and activate a virtual environment</h3>
+<pre>python -m venv venv
+source venv/bin/activate   # Windows: venv\Scripts\activate</pre>
+
+<h3>2. Install dependencies</h3>
+<pre>pip install -r requirements.txt</pre>
+
+<h3>3. Download the spaCy language model</h3>
+<pre>python -m spacy download en_core_web_lg</pre>
+
+<h3>4. Start Ollama and pull a model</h3>
+<pre>ollama pull llama3.1:8b</pre>
+
+<h3>5. Run the application</h3>
+<pre>python run.py</pre>
+<p>Visit <code>http://localhost:5000</code> in your browser.</p>
+
+<h2 class="section-break">Using the Application</h2>
+
+<h3>Step 1 — Sign in</h3>
+<p>Enter the password configured in <code>APP_PASSWORD</code>.</p>
+
+<h3>Step 2 — Select a goal and audience</h3>
+<p>Choose a <strong>content goal</strong> (what the narrative will be used for) and a <strong>target audience</strong> (who will read it). These two selections shape every part of the interview and the final narrative.</p>
+
+<table>
+    <thead><tr><th>Content Goals</th><th>Target Audiences</th></tr></thead>
+    <tbody>
+        <tr>
+            <td>
+                Promote an Event<br>
+                Promote a Program or Service<br>
+                Tell a Program Story<br>
+                Report Impact to a Funder<br>
+                Appeal to a Donor<br>
+                Recruit a Volunteer
+            </td>
+            <td>
+                Community Members Served<br>
+                Potential New Clients<br>
+                Funders / Grant Officers<br>
+                Individual Donors<br>
+                Volunteers<br>
+                Board Members<br>
+                Partners / Peer Organizations
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>Step 3 — Complete the interview</h3>
+<p>The local language model conducts a structured five-question interview, collecting five story elements in order:</p>
+<ol>
+    <li><strong>Person</strong> — who is at the center of this story</li>
+    <li><strong>Moment</strong> — a specific day or conversation where something shifted</li>
+    <li><strong>Tension</strong> — what the person was up against before the change</li>
+    <li><strong>Change</strong> — what is different now compared to where they started</li>
+    <li><strong>Outcome</strong> — what this means for them going forward</li>
+</ol>
+<p>Answer each question in your own words. The model may ask one or two follow-up questions if more detail would help. Type your response and press <strong>Enter</strong> or click <strong>Send</strong>.</p>
+
+<h3>Step 4 — Review the narrative</h3>
+<p>Once all five elements are collected, the model extracts them and sends the story to Claude, which generates a finished narrative tailored to the selected goal and audience. The narrative appears in the chat window.</p>
+
+<h3>Step 5 — Review PII flags</h3>
+<p>The output screen scans the narrative for six categories of personally identifiable information:</p>
+<ol>
+    <li><strong>Direct identifiers</strong> — names, initials, nicknames</li>
+    <li><strong>Location identifiers</strong> — specific facilities, shelters, treatment centers</li>
+    <li><strong>Relationship identifiers</strong> — names of family members (e.g. "her daughter Sofia")</li>
+    <li><strong>Case or legal identifiers</strong> — court names, case numbers, legal proceedings with dates</li>
+    <li><strong>Health or behavioral identifiers</strong> — specific diagnoses, medication names</li>
+    <li><strong>Immigration or legal status</strong> — references to undocumented status, deportation, parole</li>
+</ol>
+<p>Any flagged content is highlighted in amber within the narrative. A panel below lists each flag with a plain-language explanation of why it was flagged and a suggested fix. The system <strong>warns but does not block</strong> — the staff member is the final decision-maker before sharing.</p>
+
+<h3>Step 6 — Check the readability score</h3>
+<p>A Flesch Reading Ease score is calculated for the narrative and compared against the target reading level for the selected audience. The result is displayed as a plain-language grade label (e.g. "7th–8th grade") with a note indicating whether it matches, exceeds, or falls below the target.</p>
+
+<h3>Step 7 — Copy and use</h3>
+<p>Click <strong>Copy narrative</strong> to copy the plain text to the clipboard. Paste it into any document, email, or CMS. Use <strong>Start Over</strong> to begin a new interview with the same goal and audience, or return to the home screen to change either selection.</p>
+
+<h2>Stopping and Restarting</h2>
+<pre># Stop the stack
+docker compose down
+
+# Restart without rebuilding (model and sessions are preserved)
+docker compose up -d
+
+# Rebuild after code changes
+docker compose up --build -d web</pre>
+
+<div class="note">
+    <strong>Note:</strong> Interview data and session files are stored in the <code>interviews/</code> and <code>flask_session/</code> directories, which are mounted as volumes in Docker. They persist across container restarts. The Ollama model is stored in a named Docker volume (<code>ollama_data</code>) and also persists.
+</div>
+
+</body>
+</html>

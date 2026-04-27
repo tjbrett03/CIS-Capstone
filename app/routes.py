@@ -30,7 +30,12 @@ CLAUDE_MAX_TOKENS = 2048
 
 
 def build_narrative_prompt(extracted, goal, audience):
-    """Build the user prompt for Claude from the extracted story fields."""
+    """Build the user prompt for Claude from the extracted story fields.
+
+    Uses str.replace() rather than str.format() because story fields can
+    contain literal braces (e.g. "{name}") which would cause a KeyError
+    if passed through format().
+    """
     raw_quotes = extracted.get("raw_quotes", [])
     if isinstance(raw_quotes, list):
         raw_quotes_str = "; ".join(f'"{q}"' for q in raw_quotes)
@@ -53,7 +58,6 @@ def build_narrative_prompt(extracted, goal, audience):
         .replace("{audience_level}", audience["reading_level"])
         .replace("{audience_care}", audience["values"])
     )
-
 
 
 def save_extraction(session_id, payload):
@@ -238,6 +242,10 @@ def chat():
         trimmed = reply.strip()
         if trimmed.startswith("{") and trimmed.endswith("}"):
             try:
+                # Step 1: parse the local model's JSON extraction and save it.
+                # Step 2: send the extracted fields to Claude for narrative generation.
+                # Step 3: scan the narrative for PII and score for readability.
+                # If JSON parsing fails the interview stays open — the model will try again.
                 extracted = json.loads(trimmed)
                 save_extraction(session.sid, {
                     "goal": goal["label"],
@@ -290,3 +298,4 @@ def chat():
     except Exception:
         current_app.logger.exception("Chat request failed")
         return jsonify({"error": "Something went wrong. Please try again."}), 500
+  

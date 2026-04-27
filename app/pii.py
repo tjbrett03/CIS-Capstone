@@ -170,7 +170,7 @@ SUGGESTIONS = {
 
 # --- Scanner ---------------------------------------------------------------
 
-def _finding(text: str, start: int, end: int, category: int, reason: str) -> dict:
+def _finding(text: str, start: int, end: int, category: int, reason: str, suggestion: str = None) -> dict:
     return {
         "text": text[start:end],
         "start": start,
@@ -178,7 +178,7 @@ def _finding(text: str, start: int, end: int, category: int, reason: str) -> dic
         "category": category,
         "category_name": CATEGORIES[category],
         "reason": reason,
-        "suggestion": SUGGESTIONS[category],
+        "suggestion": suggestion if suggestion is not None else SUGGESTIONS[category],
     }
 
 
@@ -197,10 +197,21 @@ def _scan_presidio(text: str) -> list[dict]:
                 "Detected as a personal name. Names — including first names alone — can identify someone in a small community where program participation is known.",
             ))
         elif r.entity_type in ("LOCATION", "ORGANIZATION"):
-            findings.append(_finding(
-                text, r.start, r.end, 2,
-                f"Detected as a specific {r.entity_type.lower()}. Identifying a place narrows the audience to a small pool in a small community.",
-            ))
+            span = text[r.start:r.end]
+            # spaCy tags short ALL-CAPS tokens as LOCATION because they look
+            # like state abbreviations or airport codes. Reclassify those as
+            # Cat 1 (initials / nickname).
+            if span.isalpha() and span.isupper() and len(span) <= 4:
+                findings.append(_finding(
+                    text, r.start, r.end, 1,
+                    "Detected as a short identifier — could be initials, a nickname, or a place abbreviation. Review which applies and whether it identifies the person.",
+                    suggestion="If this is initials or a nickname, replace with a pronoun or generic descriptor. If it's a place abbreviation, remove it or describe the location more generally.",
+                ))
+            else:
+                findings.append(_finding(
+                    text, r.start, r.end, 2,
+                    f"Detected as a specific {r.entity_type.lower()}. Identifying a place narrows the audience to a small pool in a small community.",
+                ))
         elif r.entity_type == "PHONE_NUMBER":
             findings.append(_finding(
                 text, r.start, r.end, 1,

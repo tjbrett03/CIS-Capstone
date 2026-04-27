@@ -209,3 +209,4 @@ __marimo__/
 # Flask session files
 flask_session/
 interviews/
+.claude/
